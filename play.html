@@ -3,38 +3,71 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Play - C64</title>
+  <title>Play - C64 Online</title>
 
-  <!-- player -->
+  <!-- Usa il player locale del repo (stesso dominio) -->
   <script src="./js/vc64web_player.js"></script>
 
   <style>
-    body{font-family:system-ui,Arial,sans-serif;margin:16px}
-    #p{width:100%;height:78vh;background:#000;border-radius:12px;overflow:hidden}
-    .box{border:1px solid #ccc;border-radius:12px;padding:12px;margin-bottom:12px}
-    button{padding:10px 16px;font-weight:800;cursor:pointer}
-    code{font-weight:800}
+    body { font-family: system-ui, Arial, sans-serif; margin: 16px; }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    .box { border: 1px solid #ccc; border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+    #p { width: 100%; height: 78vh; background: #000; border-radius: 12px; overflow: hidden; }
+    button, a.btn {
+      display: inline-block;
+      padding: 10px 16px;
+      font-weight: 900;
+      cursor: pointer;
+      border: 1px solid #222;
+      border-radius: 10px;
+      background: #fff;
+      color: #000;
+      text-decoration: none;
+      margin-right: 8px;
+      margin-top: 6px;
+    }
+    code { font-weight: 900; }
+    .small { font-size: 0.95em; opacity: 0.85; }
+    .warn { color: #b00020; font-weight: 900; }
   </style>
 </head>
+
 <body>
+<div class="wrap">
   <div class="box">
-    <div><b>Autostart</b> (se resta su READY: <code>LOAD"*",8,1</code> poi <code>RUN</code>)</div>
-    <button id="go">PLAY</button>
+    <h2 style="margin:0 0 8px 0;">BANK OF HOPES - C64</h2>
+
+    <div class="small" style="margin:0 0 10px 0;">
+      Se è la tua prima volta, potresti dover caricare le ROM (una volta per browser).
+      <span class="warn">Se non parte, clicca “Guida ROM”.</span>
+    </div>
+
+    <div style="margin:0 0 10px 0;">
+      <button id="go">PLAY</button>
+      <a class="btn" href="./rom.html">Guida ROM</a>
+      <a class="btn" href="./gioco.d64">Scarica D64</a>
+    </div>
+
+    <div class="small">
+      Se resta su READY, prova manualmente: <code>LOAD"*",8,1</code> + INVIO, poi <code>RUN</code>.
+    </div>
   </div>
 
   <div id="p"></div>
+</div>
 
 <script>
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-  async function typeSlow(text, perCharMs=18){
-    for (const ch of text){
+  // Digita lentamente per evitare casino con virgolette (specie se l’utente ha warp attivo)
+  async function typeSlow(text, perCharMs = 18) {
+    for (const ch of text) {
       await action(`${ch}`);
       await sleep(perCharMs);
     }
   }
 
-  async function autorun(){
+  async function autorun() {
     await wasm_ready_after_reset();
     await sleep(150);
 
@@ -45,30 +78,32 @@
     await disk_loading_finished();
 
     await sleep(150);
+
+    // RUN
     await typeSlow('RUN', 18);
     await action(`=>Enter`);
   }
 
   document.getElementById("go").addEventListener("click", () => {
     const config = {
-      // mostra UI se vuoi (true) o la nascondi (false)
+      // UI ON così l’utente può aprire Settings / ROM install / Warp, ecc.
       navbar: true,
       wide: true,
       port2: true,
       border: 0.3,
 
-      // Non sto forzando ROM qui: userà quelle già installate nel browser.
-      // Se mancano, l’emulatore te le chiede una volta.
-      openROMS: false,
+      // Se mancano ROM, l’emulatore mostrerà il suo dialog interno
       dialog_on_missing_roms: true,
 
+      // Monta automaticamente il D64 dal tuo stesso dominio
+      // (il gioco è nella root del repo)
       buttons: [{
         run: true,
         script: `(${autorun.toString()})();`
       }]
     };
 
-    // Monta automaticamente il tuo D64 dal tuo sito
+    // Monta il disco automaticamente
     vc64web_player.samesite_file = {
       url: "./gioco.d64",
       name: "gioco.d64"
