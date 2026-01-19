@@ -45,37 +45,39 @@
 </div>
 
 <script>
-  // --- CODICE ANTI-CACHE (Uccide il vecchio Service Worker) ---
+  // --- PULIZIA CACHE ---
   if(window.navigator && navigator.serviceWorker) {
-    navigator.serviceWorker.getRegistrations()
-    .then(function(registrations) {
-      for(let registration of registrations) {
-        registration.unregister();
-        console.log("Service Worker Ucciso: Cache liberata.");
-      }
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+      for(let registration of registrations) { registration.unregister(); }
     });
   }
-  // ------------------------------------------------------------
 
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-  async function typeSlow(text, perCharMs = 18) {
-    for (const ch of text) {
-      await action(`${ch}`);
-      await sleep(perCharMs);
-    }
-  }
-
+  // --- FUNZIONE DI AUTORUN CHE CONTIENE TUTTO ---
   async function autorun() {
+    // DEFINIAMO LE FUNZIONI DI AIUTO QUI DENTRO
+    // Così l'emulatore può vederle!
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    
+    async function typeSlow(text) {
+      for (const ch of text) {
+        await action(`${ch}`);
+        await sleep(18); // Velocità digitazione
+      }
+    }
+
+    // INIZIO SEQUENZA
     await wasm_ready_after_reset();
-    await sleep(150);
-    // LOAD"*",8,1
-    await typeSlow('LOAD"*",8,1', 18);
+    await sleep(500); // Pausa di sicurezza iniziale
+
+    // LOAD
+    await typeSlow('LOAD"*",8,1');
     await action(`=>Enter`);
+
     await disk_loading_finished();
-    await sleep(150);
+    await sleep(500); // Pausa post caricamento
+
     // RUN
-    await typeSlow('RUN', 18);
+    await typeSlow('RUN');
     await action(`=>Enter`);
   }
 
@@ -85,17 +87,15 @@
       wide: true,
       port2: true,
       border: 0.3,
-      
-      // DISATTIVA la richiesta manuale delle ROM
       dialog_on_missing_roms: false,
 
-      // PERCORSI DELLE ROM (Assicurati che siano nella cartella 'roms' su GitHub)
+      // PERCORSI ROM
+      // Assicurati al 100% che su GitHub nella cartella 'roms' i file si chiamino COSI' (minuscolo)
       roms: {
           basic:   "./roms/basic.bin",
           kernal:  "./roms/kernal.bin",
-          // Mettiamo entrambe le chiavi per sicurezza massima:
           char:    "./roms/chargen.bin",
-          chargen: "./roms/chargen.bin",
+          chargen: "./roms/chargen.bin", 
           d1541:   "./roms/d1541II.bin"
       },
 
