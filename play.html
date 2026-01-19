@@ -2,106 +2,46 @@
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <title>C64 DIAGNOSTICA</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <title>C64 PRG Loader</title>
+  <script src="./js/vc64web_player.js"></script>
   <style>
-    body { background: #000; color: #0f0; font-family: monospace; padding: 20px; font-size: 16px; }
-    h1 { color: #fff; border-bottom: 1px solid #555; }
-    #log { white-space: pre-wrap; }
-    .error { color: red; font-weight: bold; }
-    .ok { color: cyan; }
-    button { font-size: 20px; padding: 10px 30px; background: yellow; border: none; cursor: pointer; display: block; margin-bottom: 20px;}
+    body { background: #111; color: #fff; font-family: sans-serif; text-align: center; }
+    #p { width: 80%; height: 600px; background: #000; border: 4px solid #666; margin: 0 auto; }
   </style>
 </head>
 <body>
-
-<h1>DIAGNOSTICA ZIP</h1>
-<button onclick="analizzaZip()">1. CLICCA QUI PER ANALIZZARE</button>
-<div id="log">In attesa...</div>
-
-<script>
-  const ZIP_URL = "./bundle.zip?v=" + Math.random(); // Trucco anti-cache
-
-  function log(text, type="") {
-    const div = document.getElementById("log");
-    div.innerHTML += `<div class="${type}">${text}</div>`;
-  }
-
-  async function analizzaZip() {
-    const div = document.getElementById("log");
-    div.innerHTML = "Inizio scaricamento bundle.zip...\n";
-    
-    try {
-      const response = await fetch(ZIP_URL);
-      if (!response.ok) throw new Error(`ERRORE: File bundle.zip non trovato (Status: ${response.status})`);
+  <div id="p"></div>
+  <script>
+    const config = {
+      navbar: true, wide: true, port2: true,
+      dialog_on_missing_roms: false, // Usa le ROM interne se può
       
-      log("Scaricamento OK. Apro lo ZIP...", "ok");
-      const blob = await response.blob();
-      const zip = await JSZip.loadAsync(blob);
-      
-      log("\n--- CONTENUTO DELLO ZIP ---");
-      let fileCount = 0;
-      let folderDetected = false;
-      let d64Found = false;
-      let romsFound = 0;
+      // Carichiamo il PRG come se fosse un file nella cartella corrente
+      samesite_file: { url: "gioco.prg", name: "gioco.prg" },
 
-      zip.forEach((relativePath, zipEntry) => {
-        fileCount++;
-        let status = "[FILE]";
-        if (zipEntry.dir) {
-            status = "[CARTELLA]";
-            folderDetected = true;
-        }
-        
-        log(`${status} ${relativePath}`);
-
-        // Analisi file
-        const name = relativePath.toLowerCase();
-        if (name.includes("/")) folderDetected = true; // C'è una sottocartella!
-        
-        if (name.includes("basic")) romsFound++;
-        if (name.includes("kernal")) romsFound++;
-        if (name.includes("char")) romsFound++;
-        if (name.endsWith(".d64") || name.endsWith(".tap")) d64Found = true;
-      });
-
-      log("\n--- RISULTATO ANALISI ---");
-      
-      if (fileCount === 0) {
-          log("LO ZIP È VUOTO!", "error");
-          return;
-      }
-
-      if (folderDetected) {
-          log("❌ ERRORE GRAVE: Hai zippato una cartella!", "error");
-          log("I file devono essere 'sciolti' nello zip, non dentro una cartella.", "error");
-          log("SOLUZIONE: Dezippa tutto. Seleziona i FILE, tasto destro -> Crea ZIP.", "error");
-      } else {
-          log("✅ Struttura cartelle: OK (Nessuna sottocartella)", "ok");
-      }
-
-      if (romsFound < 3) {
-          log(`❌ ERRORE: Mancano le ROM (Trovate: ${romsFound}/3)`, "error");
-          log("Devi avere: basic, kernal, chargen", "error");
-      } else {
-          log("✅ ROM trovate: OK", "ok");
-      }
-
-      if (!d64Found) {
-          log("❌ ERRORE: Non trovo il gioco (.d64 o .tap)", "error");
-      } else {
-          log("✅ Gioco trovato: OK", "ok");
-      }
-
-      if (!folderDetected && romsFound >= 3 && d64Found) {
-          log("\n🎉 TUTTO PERFETTO! Il problema non sono i file.", "ok");
-          log("Il problema è l'emulatore. Torna da Gemini e dimmi 'I FILE SONO OK'.", "ok");
-      }
-
-    } catch (err) {
-      log("ERRORE FATALE: " + err.message, "error");
-    }
-  }
-</script>
+      buttons: [{
+        run: true,
+        // Script ultra-veloce per PRG
+        script: `(async function() {
+           const w = (ms) => new Promise(r => setTimeout(r, ms));
+           await wasm_ready_after_reset();
+           await w(500); // Mezzo secondo di attesa
+           
+           // LOAD "gioco.prg" e RUN automatico
+           // Il trucco: action('=>LoadPrg') è un comando speciale di questo emulatore
+           // Se non va, usiamo il metodo classico:
+           
+           const type = async(t) => { for(let c of t) { await action(c); await w(20); } };
+           
+           await type('LOAD'); 
+           await action('=>Enter');
+           await w(500); // Aspetta che finisca il "SEARCHING FOR..."
+           await type('RUN'); 
+           await action('=>Enter');
+        })()`
+      }]
+    };
+    vc64web_player.load(document.getElementById("p"), encodeURIComponent(JSON.stringify(config)));
+  </script>
 </body>
 </html>
