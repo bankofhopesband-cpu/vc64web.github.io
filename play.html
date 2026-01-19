@@ -5,23 +5,32 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Play – C64 PRG</title>
 
-  <!-- vc64web player -->
   <script src="./js/vc64web_player.js"></script>
 
   <style>
     body{font-family:system-ui,Arial,sans-serif;margin:16px}
     .box{border:1px solid #ccc;border-radius:12px;padding:12px;margin-bottom:12px}
-    #emu{width:100%;height:80vh;background:#000;border-radius:12px}
-    button{padding:10px 16px;font-weight:900;cursor:pointer}
+    #emu{width:100%;height:80vh;background:#000;border-radius:12px;overflow:hidden}
+    button,a.btn{display:inline-block;padding:10px 16px;font-weight:900;cursor:pointer;border:1px solid #222;border-radius:10px;background:#fff;color:#000;text-decoration:none;margin-right:8px;margin-top:6px}
     code{font-weight:900}
+    .warn{color:#b00020;font-weight:900}
+    .small{font-size:.95em;opacity:.85}
   </style>
 </head>
 
 <body>
   <div class="box">
-    <b>Gioca online</b><br>
-    Se non parte automaticamente: <code>RUN</code><br><br>
+    <b>Gioco online (PRG)</b><br>
+    <div class="small">
+      <span class="warn">Prima volta su questo browser:</span> l’emulatore ti chiederà le ROM (BASIC/KERNAL/CHARGEN + 1541).<br>
+      Poi non te le chiede più.
+    </div>
     <button id="play">PLAY</button>
+    <a class="btn" href="./rom.html">Guida ROM</a>
+    <a class="btn" href="./gioco.prg">Scarica PRG</a>
+    <div class="small" style="margin-top:8px;">
+      Se resta su READY: <code>RUN</code>
+    </div>
   </div>
 
   <div id="emu"></div>
@@ -37,11 +46,19 @@
 
   document.getElementById("play").onclick = () => {
     const config = {
-      openROMS: true,          // 🔑 usa open ROMs → niente richiesta ROM
-      navbar: false,
+      // IMPORTANTISSIMO: niente openROMS (per compatibilità con VICE)
+      openROMS: false,
+
+      // UI ON così puoi entrare in Settings e caricare ROM / settare PAL ecc.
+      navbar: true,
+
       wide: true,
       port2: true,
       border: 0.3,
+
+      // se mancano ROM, mostra dialog
+      dialog_on_missing_roms: true,
+
       buttons: [{
         run: true,
         script: `(${autorun.toString()})();`
