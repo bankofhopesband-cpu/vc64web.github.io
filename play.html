@@ -2,33 +2,22 @@
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Play - C64 Online</title>
+  <title>Test ROM</title>
   <script src="./js/vc64web_player.js"></script>
   <style>
-    body { font-family: sans-serif; background: #222; color: #fff; margin: 20px; }
-    #status { padding: 10px; background: #333; border: 1px solid #555; margin-bottom: 10px; font-family: monospace; white-space: pre-wrap; }
-    #p { width: 100%; height: 80vh; background: #000; border: 2px solid #666; }
-    button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #0d6efd; color: white; border: none; border-radius: 5px; }
-    .error { color: #ff5555; font-weight: bold; }
-    .success { color: #55ff55; }
+    body { background: #111; color: white; font-family: sans-serif; text-align: center; padding-top: 50px; }
+    button { padding: 20px 40px; font-size: 24px; font-weight: bold; cursor: pointer; background: red; color: white; border: none; }
+    #p { margin: 20px auto; width: 80%; height: 600px; background: #000; border: 2px solid #555; }
   </style>
 </head>
 <body>
 
-<div id="status">In attesa... Premi AVVIA per caricare le ROM.</div>
-<button id="btnStart">AVVIA GIOCO</button>
+<button id="btnStart">CLICCA PER TESTARE LE ROM</button>
 
-<div id="p" style="margin-top:10px;"></div>
+<div id="p"></div>
 
 <script>
-  const statusDiv = document.getElementById("status");
-  function log(msg, type="") {
-    statusDiv.innerHTML += `<div class="${type}">${msg}</div>`;
-  }
-
-  // --- I TUOI LINK (Assicurati siano corretti) ---
-  // Usa i link COMPLETI che hai testato nel browser
+  // I TUOI LINK (Controllali!)
   const ROM_URLS = {
     basic:   "https://lucent-marzipan-81e5b7.netlify.app/roms/basic.bin",
     kernal:  "https://lucent-marzipan-81e5b7.netlify.app/roms/kernal.bin",
@@ -37,70 +26,62 @@
   };
 
   document.getElementById("btnStart").addEventListener("click", async () => {
-    document.getElementById("btnStart").style.display = 'none';
-    statusDiv.innerHTML = "Inizio download ROMs...\n";
+    
+    // 1. PRIMO POPUP DI CONTROLLO
+    alert("Inizio il test. Se leggi questo, il codice è nuovo.");
 
     try {
-      // 1. Scarichiamo le ROM manualmente per vedere se ci sono
       const romBlobs = {};
-      
+      let report = "Report Scaricamento:\n";
+
       for (const [key, url] of Object.entries(ROM_URLS)) {
-        log(`Scarico ${key} da: ${url} ...`);
+        // Scarichiamo il file
         const resp = await fetch(url);
         
         if (!resp.ok) {
-          throw new Error(`ERRORE: Impossibile scaricare ${key} (Status: ${resp.status})`);
+           alert("ERRORE CRITICO!\nNon riesco a trovare: " + key + "\nLink provato: " + url);
+           return; // Ci fermiamo subito
         }
         
         const blob = await resp.blob();
-        if (blob.size < 1000) {
-           log(`ATTENZIONE: Il file ${key} è troppo piccolo (${blob.size} bytes). Probabilmente è corrotto.`, "error");
-        } else {
-           log(`OK: ${key} scaricato (${blob.size} bytes).`, "success");
-        }
-        
-        // Creiamo un URL interno (blob:...) che l'emulatore non può sbagliare
+        report += key + ": OK (" + blob.size + " bytes)\n";
         romBlobs[key] = URL.createObjectURL(blob);
       }
 
-      log("Tutte le ROM scaricate. Avvio emulatore...", "success");
+      // 2. SECONDO POPUP: TUTTO OK
+      alert(report + "\n\nAdesso provo a lanciare l'emulatore.");
 
-      // 2. Configuriamo l'emulatore con i nuovi Blob URL
+      // Configurazione
       const config = {
-        navbar: true, 
-        wide: true, 
-        port2: true,
-        dialog_on_missing_roms: false, // Non chiedere nulla all'utente
+        navbar: true, wide: true, port2: true,
+        dialog_on_missing_roms: false, // ZITTO E CARICA
         roms: {
             basic:   romBlobs.basic,
             kernal:  romBlobs.kernal,
             char:    romBlobs.char,
-            chargen: romBlobs.char, // Doppia chiave per sicurezza
+            chargen: romBlobs.char, 
             d1541:   romBlobs.d1541
         },
         buttons: [{
           run: true,
           script: `(async function() {
-             const sleep = (ms) => new Promise(r => setTimeout(r, ms));
              await wasm_ready_after_reset();
-             await sleep(1000);
-             const type = async(t) => { for(let c of t) { await action(c); await sleep(20); } };
-             await type('LOAD"*",8,1'); await action('=>Enter');
+             const s = (ms) => new Promise(r => setTimeout(r, ms));
+             await s(1000);
+             const t = async(text) => { for(let c of text) { await action(c); await s(20); } };
+             await t('LOAD"*",8,1'); await action('=>Enter');
              await disk_loading_finished();
-             await sleep(500);
-             await type('RUN'); await action('=>Enter');
+             await s(500);
+             await t('RUN'); await action('=>Enter');
           })()`
         }]
       };
 
       vc64web_player.samesite_file = { url: "./gioco.d64", name: "gioco.d64" };
-      
       vc64web_player.load(document.getElementById("p"), encodeURIComponent(JSON.stringify(config)));
 
     } catch (err) {
-      log(err.message, "error");
-      alert("ERRORE BLOCCANTE:\n" + err.message);
-      document.getElementById("btnStart").style.display = 'inline-block';
+      alert("ERRORE SCONOSCIUTO:\n" + err.message);
     }
   });
 </script>
