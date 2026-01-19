@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Setup ROM - C64 Online</title>
+  <style>
+    body{font-family:system-ui,Arial,sans-serif;margin:16px;line-height:1.35}
+    .wrap{max-width:900px;margin:0 auto}
+    .box{border:1px solid #ccc;border-radius:12px;padding:14px;margin:12px 0}
+    code{font-weight:800}
+    .ok{color:#0a7a0a;font-weight:800}
+    .warn{color:#b00020;font-weight:800}
+    a.button{display:inline-block;padding:10px 14px;border:1px solid #222;border-radius:10px;text-decoration:none;font-weight:800}
+    ul{margin:8px 0 0 18px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Setup ROM (solo la prima volta)</h1>
+
+  <div class="box">
+    <p><b>Per giocare, l’emulatore deve avere le ROM del C64 e del drive 1541.</b></p>
+    <p>Questa operazione si fa <b>una sola volta per browser/dispositivo</b>. Se cambi browser o usi la modalità incognito, te le richiederà di nuovo.</p>
+  </div>
+
+  <div class="box">
+    <h2>Passi (2 minuti)</h2>
+    <ol>
+      <li>Apri il gioco: <a class="button" href="./play.html">Vai al gioco</a></li>
+      <li>Quando l’emulatore segnala <b>ROM mancanti</b>, scegli <b>Install/Load ROMs</b>.</li>
+      <li>Seleziona le ROM richieste:
+        <ul>
+          <li><b>C64</b>: <code>BASIC</code>, <code>KERNAL</code>, <code>CHARGEN</code></li>
+          <li><b>Drive</b>: <code>1541</code> (o 1541-II)</li>
+        </ul>
+      </li>
+      <li>Ricarica la pagina del gioco (<code>play.html</code>) se non parte da solo.</li>
+    </ol>
+    <p class="warn">Nota: qui non fornisco ROM da scaricare. Devi usare le tue ROM legittime (es. dal tuo setup VICE).</p>
+  </div>
+
+  <div class="box">
+    <h2>Se non parte</h2>
+    <p>Dopo che il disco è montato, il gioco dovrebbe avviarsi da solo. In caso contrario al prompt:</p>
+    <p><code>LOAD"*",8,1</code> + INVIO, poi <code>RUN</code></p>
+  </div>
+
+  <p><a href="./play.html">Torna al gioco</a></p>
+</div>
+</body>
+</html>
