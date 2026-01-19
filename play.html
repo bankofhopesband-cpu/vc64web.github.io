@@ -4,117 +4,104 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Play - C64 Online</title>
-
   <script src="./js/vc64web_player.js"></script>
-
   <style>
-    body { font-family: system-ui, Arial, sans-serif; margin: 16px; }
-    .wrap { max-width: 1100px; margin: 0 auto; }
-    .box { border: 1px solid #ccc; border-radius: 12px; padding: 12px; margin-bottom: 12px; }
-    #p { width: 100%; height: 78vh; background: #000; border-radius: 12px; overflow: hidden; }
-    button, a.btn {
-      display: inline-block;
-      padding: 10px 16px;
-      font-weight: 900;
-      cursor: pointer;
-      border: 1px solid #222;
-      border-radius: 10px;
-      background: #fff;
-      color: #000;
-      text-decoration: none;
-      margin-right: 8px;
-      margin-top: 6px;
-    }
-    code { font-weight: 900; }
-    .small { font-size: 0.95em; opacity: 0.85; }
+    body { font-family: sans-serif; background: #222; color: #fff; margin: 20px; }
+    #status { padding: 10px; background: #333; border: 1px solid #555; margin-bottom: 10px; font-family: monospace; white-space: pre-wrap; }
+    #p { width: 100%; height: 80vh; background: #000; border: 2px solid #666; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #0d6efd; color: white; border: none; border-radius: 5px; }
+    .error { color: #ff5555; font-weight: bold; }
+    .success { color: #55ff55; }
   </style>
 </head>
-
 <body>
-<div class="wrap">
-  <div class="box">
-    <h2 style="margin:0 0 8px 0;">BANK OF HOPES - C64</h2>
-    <div class="small" style="margin:0 0 10px 0;">Premi PLAY per iniziare.</div>
-    <div style="margin:0 0 10px 0;">
-      <button id="go">PLAY</button>
-      <a class="btn" href="./gioco.d64">Scarica D64</a>
-    </div>
-    <div class="small">Se resta su READY, attendi qualche secondo l'avvio automatico.</div>
-  </div>
-  <div id="p"></div>
-</div>
+
+<div id="status">In attesa... Premi AVVIA per caricare le ROM.</div>
+<button id="btnStart">AVVIA GIOCO</button>
+
+<div id="p" style="margin-top:10px;"></div>
 
 <script>
-  // --- PULIZIA CACHE ---
-  if(window.navigator && navigator.serviceWorker) {
-    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-      for(let registration of registrations) { registration.unregister(); }
-    });
+  const statusDiv = document.getElementById("status");
+  function log(msg, type="") {
+    statusDiv.innerHTML += `<div class="${type}">${msg}</div>`;
   }
 
-  // --- FUNZIONE DI AUTORUN CHE CONTIENE TUTTO ---
-  async function autorun() {
-    // DEFINIAMO LE FUNZIONI DI AIUTO QUI DENTRO
-    // Così l'emulatore può vederle!
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-    
-    async function typeSlow(text) {
-      for (const ch of text) {
-        await action(`${ch}`);
-        await sleep(18); // Velocità digitazione
+  // --- I TUOI LINK (Assicurati siano corretti) ---
+  // Usa i link COMPLETI che hai testato nel browser
+  const ROM_URLS = {
+    basic:   "https://lucent-marzipan-81e5b7.netlify.app/roms/basic.bin",
+    kernal:  "https://lucent-marzipan-81e5b7.netlify.app/roms/kernal.bin",
+    char:    "https://lucent-marzipan-81e5b7.netlify.app/roms/chargen.bin",
+    d1541:   "https://lucent-marzipan-81e5b7.netlify.app/roms/d1541II.bin"
+  };
+
+  document.getElementById("btnStart").addEventListener("click", async () => {
+    document.getElementById("btnStart").style.display = 'none';
+    statusDiv.innerHTML = "Inizio download ROMs...\n";
+
+    try {
+      // 1. Scarichiamo le ROM manualmente per vedere se ci sono
+      const romBlobs = {};
+      
+      for (const [key, url] of Object.entries(ROM_URLS)) {
+        log(`Scarico ${key} da: ${url} ...`);
+        const resp = await fetch(url);
+        
+        if (!resp.ok) {
+          throw new Error(`ERRORE: Impossibile scaricare ${key} (Status: ${resp.status})`);
+        }
+        
+        const blob = await resp.blob();
+        if (blob.size < 1000) {
+           log(`ATTENZIONE: Il file ${key} è troppo piccolo (${blob.size} bytes). Probabilmente è corrotto.`, "error");
+        } else {
+           log(`OK: ${key} scaricato (${blob.size} bytes).`, "success");
+        }
+        
+        // Creiamo un URL interno (blob:...) che l'emulatore non può sbagliare
+        romBlobs[key] = URL.createObjectURL(blob);
       }
+
+      log("Tutte le ROM scaricate. Avvio emulatore...", "success");
+
+      // 2. Configuriamo l'emulatore con i nuovi Blob URL
+      const config = {
+        navbar: true, 
+        wide: true, 
+        port2: true,
+        dialog_on_missing_roms: false, // Non chiedere nulla all'utente
+        roms: {
+            basic:   romBlobs.basic,
+            kernal:  romBlobs.kernal,
+            char:    romBlobs.char,
+            chargen: romBlobs.char, // Doppia chiave per sicurezza
+            d1541:   romBlobs.d1541
+        },
+        buttons: [{
+          run: true,
+          script: `(async function() {
+             const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+             await wasm_ready_after_reset();
+             await sleep(1000);
+             const type = async(t) => { for(let c of t) { await action(c); await sleep(20); } };
+             await type('LOAD"*",8,1'); await action('=>Enter');
+             await disk_loading_finished();
+             await sleep(500);
+             await type('RUN'); await action('=>Enter');
+          })()`
+        }]
+      };
+
+      vc64web_player.samesite_file = { url: "./gioco.d64", name: "gioco.d64" };
+      
+      vc64web_player.load(document.getElementById("p"), encodeURIComponent(JSON.stringify(config)));
+
+    } catch (err) {
+      log(err.message, "error");
+      alert("ERRORE BLOCCANTE:\n" + err.message);
+      document.getElementById("btnStart").style.display = 'inline-block';
     }
-
-    // INIZIO SEQUENZA
-    await wasm_ready_after_reset();
-    await sleep(500); // Pausa di sicurezza iniziale
-
-    // LOAD
-    await typeSlow('LOAD"*",8,1');
-    await action(`=>Enter`);
-
-    await disk_loading_finished();
-    await sleep(500); // Pausa post caricamento
-
-    // RUN
-    await typeSlow('RUN');
-    await action(`=>Enter`);
-  }
-
-  document.getElementById("go").addEventListener("click", () => {
-    const config = {
-      navbar: true,
-      wide: true,
-      port2: true,
-      border: 0.3,
-      dialog_on_missing_roms: false,
-
-      // PERCORSI ROM
-      // Assicurati al 100% che su GitHub nella cartella 'roms' i file si chiamino COSI' (minuscolo)
-    roms: {
-          // Incolla qui i link completi che hai verificato:
-          basic:   "https://lucent-marzipan-81e5b7.netlify.app/roms/basic.bin",
-          kernal:  "https://lucent-marzipan-81e5b7.netlify.app/roms/kernal.bin",
-          char:    "https://lucent-marzipan-81e5b7.netlify.app/roms/chargen.bin",
-          chargen: "https://lucent-marzipan-81e5b7.netlify.app/roms/chargen.bin",
-          d1541:   "https://lucent-marzipan-81e5b7.netlify.app/roms/d1541II.bin"
-      },
-
-      buttons: [{
-        run: true,
-        script: `(${autorun.toString()})();`
-      }]
-    };
-
-    vc64web_player.samesite_file = {
-      url: "./gioco.d64",
-      name: "gioco.d64"
-    };
-
-    vc64web_player.load(
-      document.getElementById("p"),
-      encodeURIComponent(JSON.stringify(config))
-    );
   });
 </script>
 </body>
