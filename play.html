@@ -1,80 +1,94 @@
 <!doctype html>
 <html lang="it">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Play – C64 PRG</title>
-
-  <script src="./js/vc64web_player.js"></script>
-
+  <meta charset="utf-8" />
+  <title>C64 Web Player</title>
+  
+  <script src="./vc64web_player.js"></script>
+  
   <style>
-    body{font-family:system-ui,Arial,sans-serif;margin:16px}
-    .box{border:1px solid #ccc;border-radius:12px;padding:12px;margin-bottom:12px}
-    #emu{width:100%;height:80vh;background:#000;border-radius:12px;overflow:hidden}
-    button,a.btn{display:inline-block;padding:10px 16px;font-weight:900;cursor:pointer;border:1px solid #222;border-radius:10px;background:#fff;color:#000;text-decoration:none;margin-right:8px;margin-top:6px}
-    code{font-weight:900}
-    .warn{color:#b00020;font-weight:900}
-    .small{font-size:.95em;opacity:.85}
+    body { 
+      background-color: #202020; 
+      color: #ccc; 
+      font-family: monospace; 
+      text-align: center; 
+      margin: 0; 
+      padding-top: 20px;
+    }
+    
+    h1 { margin-bottom: 10px; color: #fff; }
+
+    #c64-container { 
+      width: 80%; 
+      max-width: 900px; 
+      height: 600px; 
+      margin: 0 auto; 
+      border: 6px solid #444; 
+      background: #000; 
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    }
   </style>
 </head>
-
 <body>
-  <div class="box">
-    <b>Gioco online (PRG)</b><br>
-    <div class="small">
-      <span class="warn">Prima volta su questo browser:</span> l’emulatore ti chiederà le ROM (BASIC/KERNAL/CHARGEN + 1541).<br>
-      Poi non te le chiede più.
-    </div>
-    <button id="play">PLAY</button>
-    <a class="btn" href="./rom.html">Guida ROM</a>
-    <a class="btn" href="./gioco.prg">Scarica PRG</a>
-    <div class="small" style="margin-top:8px;">
-      Se resta su READY: <code>RUN</code>
-    </div>
-  </div>
 
-  <div id="emu"></div>
+  <h1>COMMODORE 64 LOADER</h1>
+  <div id="c64-container"></div>
+  <p>Attendi il caricamento automatico (LOAD"*",8,1)...</p>
 
-<script>
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-  async function autorun(){
-    await wasm_ready_after_reset();
-    await sleep(200);
-    await action('RUN=>Enter');
-  }
-
-  document.getElementById("play").onclick = () => {
+  <script>
     const config = {
-      // IMPORTANTISSIMO: niente openROMS (per compatibilità con VICE)
-      openROMS: false,
-
-      // UI ON così puoi entrare in Settings e caricare ROM / settare PAL ecc.
+      // Impostazioni Grafiche
       navbar: true,
-
       wide: true,
-      port2: true,
-      border: 0.3,
+      port2: true, // Joystick attivo su Porta 2
+      
+      // Fondamentale: non bloccare se mancano le ROM originali
+      dialog_on_missing_roms: false,
 
-      // se mancano ROM, mostra dialog
-      dialog_on_missing_roms: true,
+      // Qui diciamo all'emulatore di montare il tuo gioco
+      samesite_file: { 
+          url: "gioco.prg", 
+          name: "gioco.prg" 
+      },
 
+      // AUTOPILOTA: Scrive i comandi corretti per evitare l'errore UNDEF'D
       buttons: [{
         run: true,
-        script: `(${autorun.toString()})();`
+        script: `(async function() {
+             const wait = (ms) => new Promise(r => setTimeout(r, ms));
+             
+             // 1. Aspetta che il motore WASM sia carico e il C64 resettato
+             await wasm_ready_after_reset();
+             await wait(1500); 
+
+             const type = async(text) => { for(let c of text) { await action(c); await wait(60); } };
+             
+             // 2. Scrive il comando di caricamento ASSOLUTO
+             // Le virgolette e la virgola sono gestite apposta per evitare problemi
+             await type('LOAD');
+             await action('"');
+             await type('*');
+             await action('"');
+             await action(',');
+             await type('8');
+             await action(',');
+             await type('1'); // <--- QUESTO "1" RISOLVE IL TUO ERRORE!
+             
+             await action('=>Enter');
+             
+             // 3. Aspetta il caricamento (aumentato a 3 secondi per sicurezza)
+             await wait(3000);
+             
+             // 4. Lancia il gioco
+             await type('RUN'); 
+             await action('=>Enter');
+        })()`
       }]
     };
 
-    vc64web_player.samesite_file = {
-      url: "./gioco.prg",
-      name: "gioco.prg"
-    };
+    // Avvia l'emulatore dentro il div "c64-container"
+    vc64web_player.load(document.getElementById("c64-container"), encodeURIComponent(JSON.stringify(config)));
+  </script>
 
-    vc64web_player.load(
-      document.getElementById("emu"),
-      encodeURIComponent(JSON.stringify(config))
-    );
-  };
-</script>
 </body>
 </html>
