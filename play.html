@@ -2,129 +2,147 @@
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>C64 - ZIP Loader</title>
-  
+  <title>C64 - Iniezione Totale</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="./js/vc64web_player.js"></script>
-
   <style>
-    body { background: #222; color: #fff; font-family: monospace; text-align: center; margin-top: 20px; }
-    #status { padding: 15px; border: 1px solid #444; background: #000; white-space: pre-wrap; margin-bottom: 20px; color: #0f0; }
-    button { padding: 15px 30px; font-size: 20px; font-weight: bold; cursor: pointer; background: #ff9900; color: black; border: none; }
-    #p { width: 90%; height: 70vh; background: #000; border: 4px solid #666; margin: 0 auto; }
+    body { background: #111; color: #ddd; font-family: monospace; text-align: center; padding: 20px; }
+    #log { text-align: left; background: #000; border: 1px solid #444; padding: 10px; height: 150px; overflow-y: scroll; margin-bottom: 20px; color: #0f0; }
+    button { padding: 20px 40px; font-size: 20px; background: red; color: white; border: none; cursor: pointer; font-weight: bold; }
+    #p { width: 80%; height: 600px; background: #000; border: 4px solid #666; margin: 0 auto; }
   </style>
 </head>
-
 <body>
 
-<h2>CARICAMENTO DA ZIP UNICO</h2>
-<div id="status">In attesa... Assicurati di aver caricato 'bundle.zip'</div>
-<button id="btnLoad">APRI IL PACCO REGALO (bundle.zip)</button>
-
+<div id="log">LOG SISTEMA...</div>
+<button id="btnStart">AVVIA (FORCE LOAD)</button>
 <div id="p"></div>
 
 <script>
-  // CONFIGURAZIONE: Assicurati che il nome sia giusto
-  const ZIP_URL = "./bundle.zip"; 
-  // Se il file è in una cartella roms: "./roms/bundle.zip"
+  const ZIP_FILE = "./bundle.zip";
+  const logger = document.getElementById("log");
+  
+  function log(txt) { 
+      logger.innerHTML += "<div>" + txt + "</div>"; 
+      logger.scrollTop = logger.scrollHeight;
+  }
 
-  const logDiv = document.getElementById("status");
-  function log(msg) { logDiv.innerText += "\n" + msg; }
-
-  document.getElementById("btnLoad").addEventListener("click", async function() {
-    const btn = this;
+  document.getElementById("btnStart").addEventListener("click", async () => {
+    const btn = document.getElementById("btnStart");
     btn.disabled = true;
-    log("Scarico il file ZIP...");
+    log("Scarico ZIP...");
 
     try {
-      // 1. Scarica lo ZIP intero
-      const response = await fetch(ZIP_URL);
-      if (!response.ok) throw new Error("File bundle.zip non trovato! Controlla dove l'hai messo.");
-      const blob = await response.blob();
-
-      // 2. Apre lo ZIP
-      log("Apro lo ZIP...");
+      // 1. Scarica ZIP
+      const resp = await fetch(ZIP_FILE);
+      if (!resp.ok) throw new Error("ZIP non trovato!");
+      const blob = await resp.blob();
+      
+      // 2. Apre ZIP
       const zip = await JSZip.loadAsync(blob);
-      
-      const files = {};
-      let gameFile = null;
+      log("ZIP aperto. Cerco file...");
 
-      // 3. Cerca i file dentro lo ZIP (ignora maiuscole/minuscole)
-      log("Cerco le ROM e il gioco...");
-      
-      // Funzione helper per cercare file ignorando il case
-      const findFile = (namePart) => {
-         const found = Object.keys(zip.files).find(n => n.toLowerCase().includes(namePart.toLowerCase()));
-         return found ? zip.files[found] : null;
+      // Funzione cerca file (ignorando maiuscole/minuscole)
+      const getFileBase64 = async (keyword) => {
+        const name = Object.keys(zip.files).find(n => n.toLowerCase().includes(keyword));
+        if (!name) return null;
+        log("Trovato: " + name);
+        // IMPORTANTE: Estraiamo direttamente in BASE64 per non corrompere i binari
+        return await zip.files[name].async("base64");
       };
 
-      // Estraiamo i dati come Blob
-      const basic   = findFile("basic");
-      const kernal  = findFile("kernal");
-      const chargen = findFile("char");
-      const d1541   = findFile("d1541");
+      // 3. Convertiamo tutto in Base64
+      const basic = await getFileBase64("basic");
+      const kernal = await getFileBase64("kernal");
+      const char = await getFileBase64("char"); // cerca 'char' o 'chargen'
+      const d1541 = await getFileBase64("d1541");
       
       // Cerchiamo il gioco (.d64 o .tap)
-      const gameEntry = Object.keys(zip.files).find(n => n.toLowerCase().endsWith(".d64") || n.toLowerCase().endsWith(".tap"));
-
-      if (!basic || !kernal || !chargen) {
-        throw new Error("MANCANO LE ROM NELLO ZIP!\nDevi metterci dentro: basic.bin, kernal.bin, chargen.bin");
-      }
-      if (!gameEntry) {
-        throw new Error("MANCA IL GIOCO NELLO ZIP!\nNon trovo nessun file .d64 o .tap");
-      }
-
-      // Convertiamo tutto in URL per l'emulatore
-      const basicUrl   = URL.createObjectURL(await basic.async("blob"));
-      const kernalUrl  = URL.createObjectURL(await kernal.async("blob"));
-      const charUrl    = URL.createObjectURL(await chargen.async("blob"));
-      const d1541Url   = d1541 ? URL.createObjectURL(await d1541.async("blob")) : null;
+      const gameName = Object.keys(zip.files).find(n => n.toLowerCase().endsWith(".d64") || n.toLowerCase().endsWith(".tap"));
+      if (!gameName) throw new Error("Nessun gioco (.d64/.tap) nello ZIP!");
       
-      const gameBlob   = await zip.files[gameEntry].async("blob");
-      const gameUrl    = URL.createObjectURL(gameBlob);
+      const gameData = await zip.files[gameName].async("base64");
+      const isTape = gameName.toLowerCase().endsWith(".tap");
 
-      log(`Trovato gioco: ${gameEntry}`);
-      log("ROM pronte. Avvio...");
+      if (!basic || !kernal || !char) throw new Error("Mancano le ROM di sistema nello ZIP!");
 
-      // 4. Configurazione Emulatore
+      log("File convertiti. Preparo emulatore...");
+
+      // 4. Creiamo il FileSystem Virtuale
+      // Invece di dare link, diamo direttamente i DATI al player
+      const virtualFiles = [
+          { name: "basic.bin", content: basic },
+          { name: "kernal.bin", content: kernal },
+          { name: "chargen.bin", content: char },
+          // Salviamo il gioco col nome standard 'game_disk' nel filesystem virtuale
+          { name: gameName, content: gameData }
+      ];
+      
+      if (d1541) virtualFiles.push({ name: "d1541.bin", content: d1541 });
+
+      // 5. Configurazione
       const config = {
         navbar: true, wide: true, port2: true,
-        dialog_on_missing_roms: false, // Silenzia le richieste
+        dialog_on_missing_roms: false,
+        
+        // Carica i file nella pancia dell'emulatore
+        files: virtualFiles,
+
+        // Dice all'emulatore quali file usare come BIOS
         roms: {
-            basic:   basicUrl,
-            kernal:  kernalUrl,
-            char:    charUrl,
-            chargen: charUrl,
-            d1541:   d1541Url // Se è null (manca), pazienza
+            basic: "basic.bin",
+            kernal: "kernal.bin",
+            char: "chargen.bin",
+            chargen: "chargen.bin",
+            d1541: d1541 ? "d1541.bin" : null
         },
+
+        // Dice all'emulatore quale file montare nel drive/registratore
+        // Nota: Passiamo un oggetto con 'name' che corrisponde a quello in 'files'
+        samesite_file: { 
+            name: gameName, 
+            data: gameData // Passiamo i dati anche qui per sicurezza estrema
+        },
+
         buttons: [{
           run: true,
           script: `(async function() {
-             await wasm_ready_after_reset();
              const w = (ms) => new Promise(r => setTimeout(r, ms));
-             await w(1000);
-             // Auto-load intelligente
-             const cmd = '${gameEntry.endsWith(".tap") ? "LOAD" : 'LOAD"*",8,1'}';
-             const type = async(t) => { for(let c of t) { await action(c); await w(30); } };
-             await type(cmd); await action('=>Enter');
-             await disk_loading_finished(); // Aspetta caricamento
-             await w(500);
-             await type('RUN'); await action('=>Enter');
+             await wasm_ready_after_reset();
+             await w(2000); // Pausa di sicurezza
+             
+             const type = async(t) => { for(let c of t) { await action(c); await w(40); } };
+
+             // COMANDO DI CARICAMENTO
+             if (${isTape}) {
+                 await type('LOAD'); await action('=>Enter');
+                 await w(1000);
+                 await type('RUN'); await action('=>Enter');
+             } else {
+                 // Per i dischi, carichiamo la directory per vedere se la legge
+                 // Se carica la directory, poi carichiamo il primo file
+                 await type('LOAD"*",8,1'); 
+                 await action('=>Enter');
+                 
+                 // Aspetta che il drive smetta di girare
+                 await disk_loading_finished(); 
+                 await w(1000);
+                 
+                 await type('RUN'); 
+                 await action('=>Enter');
+             }
           })()`
         }]
       };
 
-      vc64web_player.samesite_file = { url: gameUrl, name: gameEntry };
-      
+      // Lancio
       vc64web_player.load(document.getElementById("p"), encodeURIComponent(JSON.stringify(config)));
       
       btn.style.display = 'none';
 
-    } catch (err) {
-      log("ERRORE: " + err.message);
-      alert(err.message);
-      btn.disabled = false;
+    } catch (e) {
+      log("ERRORE FATALE: " + e.message);
+      alert(e.message);
     }
   });
 </script>
