@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Play - C64 Online</title>
 
-  <!-- Usa il player locale del repo (stesso dominio) -->
   <script src="./js/vc64web_player.js"></script>
 
   <style>
@@ -38,18 +37,16 @@
     <h2 style="margin:0 0 8px 0;">BANK OF HOPES - C64</h2>
 
     <div class="small" style="margin:0 0 10px 0;">
-      Se è la tua prima volta, potresti dover caricare le ROM (una volta per browser).
-      <span class="warn">Se non parte, clicca “Guida ROM”.</span>
+      Premi PLAY per iniziare. Il caricamento è automatico.
     </div>
 
     <div style="margin:0 0 10px 0;">
       <button id="go">PLAY</button>
-      <a class="btn" href="./rom.html">Guida ROM</a>
       <a class="btn" href="./gioco.d64">Scarica D64</a>
     </div>
 
     <div class="small">
-      Se resta su READY, prova manualmente: <code>LOAD"*",8,1</code> + INVIO, poi <code>RUN</code>.
+      Se resta su READY, non toccare nulla: il gioco partirà da solo in pochi secondi.
     </div>
   </div>
 
@@ -86,17 +83,26 @@
 
   document.getElementById("go").addEventListener("click", () => {
     const config = {
-      // UI ON così l’utente può aprire Settings / ROM install / Warp, ecc.
+      // UI ON così l’utente può aprire Settings / Warp, ecc.
       navbar: true,
       wide: true,
       port2: true,
       border: 0.3,
 
-      // Se mancano ROM, l’emulatore mostrerà il suo dialog interno
-      dialog_on_missing_roms: true,
+      // --- MODIFICA: CARICAMENTO AUTOMATICO ROM ---
+      // Impostiamo questo a false o lo omettiamo, perchè forniamo noi i file
+      dialog_on_missing_roms: false,
 
-      // Monta automaticamente il D64 dal tuo stesso dominio
-      // (il gioco è nella root del repo)
+      // Qui indichiamo i percorsi dei file .bin sul tuo server
+      roms: {
+          basic:  "./basic.bin",      // Assicurati di avere questo file
+          kernal: "./kernal.bin",     // Assicurati di avere questo file
+          char:   "./chargen.bin",    // Assicurati di avere questo file
+          d1541:  "./d1541II.bin"     // Il file che hai rinominato tu
+      },
+      // --------------------------------------------
+
+      // Script di auto-avvio
       buttons: [{
         run: true,
         script: `(${autorun.toString()})();`
