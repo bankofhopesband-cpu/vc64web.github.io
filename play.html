@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Play - C64</title>
+
+  <!-- player -->
+  <script src="./js/vc64web_player.js"></script>
+
+  <style>
+    body{font-family:system-ui,Arial,sans-serif;margin:16px}
+    #p{width:100%;height:78vh;background:#000;border-radius:12px;overflow:hidden}
+    .box{border:1px solid #ccc;border-radius:12px;padding:12px;margin-bottom:12px}
+    button{padding:10px 16px;font-weight:800;cursor:pointer}
+    code{font-weight:800}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div><b>Autostart</b> (se resta su READY: <code>LOAD"*",8,1</code> poi <code>RUN</code>)</div>
+    <button id="go">PLAY</button>
+  </div>
+
+  <div id="p"></div>
+
+<script>
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  async function typeSlow(text, perCharMs=18){
+    for (const ch of text){
+      await action(`${ch}`);
+      await sleep(perCharMs);
+    }
+  }
+
+  async function autorun(){
+    await wasm_ready_after_reset();
+    await sleep(150);
+
+    // LOAD"*",8,1
+    await typeSlow('LOAD"*",8,1', 18);
+    await action(`=>Enter`);
+
+    await disk_loading_finished();
+
+    await sleep(150);
+    await typeSlow('RUN', 18);
+    await action(`=>Enter`);
+  }
+
+  document.getElementById("go").addEventListener("click", () => {
+    const config = {
+      // mostra UI se vuoi (true) o la nascondi (false)
+      navbar: true,
+      wide: true,
+      port2: true,
+      border: 0.3,
+
+      // Non sto forzando ROM qui: userà quelle già installate nel browser.
+      // Se mancano, l’emulatore te le chiede una volta.
+      openROMS: false,
+      dialog_on_missing_roms: true,
+
+      buttons: [{
+        run: true,
+        script: `(${autorun.toString()})();`
+      }]
+    };
+
+    // Monta automaticamente il tuo D64 dal tuo sito
+    vc64web_player.samesite_file = {
+      url: "./gioco.d64",
+      name: "gioco.d64"
+    };
+
+    vc64web_player.load(
+      document.getElementById("p"),
+      encodeURIComponent(JSON.stringify(config))
+    );
+  });
+</script>
+</body>
+</html>
