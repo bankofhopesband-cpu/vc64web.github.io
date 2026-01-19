@@ -1,47 +1,63 @@
 <!doctype html>
 <html lang="it">
 <head>
-  <meta charset="utf-8" />
-  <title>C64 PRG Loader</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Play – C64 PRG</title>
+
+  <!-- vc64web player -->
   <script src="./js/vc64web_player.js"></script>
+
   <style>
-    body { background: #111; color: #fff; font-family: sans-serif; text-align: center; }
-    #p { width: 80%; height: 600px; background: #000; border: 4px solid #666; margin: 0 auto; }
+    body{font-family:system-ui,Arial,sans-serif;margin:16px}
+    .box{border:1px solid #ccc;border-radius:12px;padding:12px;margin-bottom:12px}
+    #emu{width:100%;height:80vh;background:#000;border-radius:12px}
+    button{padding:10px 16px;font-weight:900;cursor:pointer}
+    code{font-weight:900}
   </style>
 </head>
-<body>
-  <div id="p"></div>
-  <script>
-    const config = {
-      navbar: true, wide: true, port2: true,
-      dialog_on_missing_roms: false, // Usa le ROM interne se può
-      
-      // Carichiamo il PRG come se fosse un file nella cartella corrente
-      samesite_file: { url: "gioco.prg", name: "gioco.prg" },
 
+<body>
+  <div class="box">
+    <b>Gioca online</b><br>
+    Se non parte automaticamente: <code>RUN</code><br><br>
+    <button id="play">PLAY</button>
+  </div>
+
+  <div id="emu"></div>
+
+<script>
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  async function autorun(){
+    await wasm_ready_after_reset();
+    await sleep(200);
+    await action('RUN=>Enter');
+  }
+
+  document.getElementById("play").onclick = () => {
+    const config = {
+      openROMS: true,          // 🔑 usa open ROMs → niente richiesta ROM
+      navbar: false,
+      wide: true,
+      port2: true,
+      border: 0.3,
       buttons: [{
         run: true,
-        // Script ultra-veloce per PRG
-        script: `(async function() {
-           const w = (ms) => new Promise(r => setTimeout(r, ms));
-           await wasm_ready_after_reset();
-           await w(500); // Mezzo secondo di attesa
-           
-           // LOAD "gioco.prg" e RUN automatico
-           // Il trucco: action('=>LoadPrg') è un comando speciale di questo emulatore
-           // Se non va, usiamo il metodo classico:
-           
-           const type = async(t) => { for(let c of t) { await action(c); await w(20); } };
-           
-           await type('LOAD'); 
-           await action('=>Enter');
-           await w(500); // Aspetta che finisca il "SEARCHING FOR..."
-           await type('RUN'); 
-           await action('=>Enter');
-        })()`
+        script: `(${autorun.toString()})();`
       }]
     };
-    vc64web_player.load(document.getElementById("p"), encodeURIComponent(JSON.stringify(config)));
-  </script>
+
+    vc64web_player.samesite_file = {
+      url: "./gioco.prg",
+      name: "gioco.prg"
+    };
+
+    vc64web_player.load(
+      document.getElementById("emu"),
+      encodeURIComponent(JSON.stringify(config))
+    );
+  };
+</script>
 </body>
 </html>
