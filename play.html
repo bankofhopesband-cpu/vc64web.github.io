@@ -27,7 +27,6 @@
     }
     code { font-weight: 900; }
     .small { font-size: 0.95em; opacity: 0.85; }
-    .warn { color: #b00020; font-weight: 900; }
   </style>
 </head>
 
@@ -35,28 +34,31 @@
 <div class="wrap">
   <div class="box">
     <h2 style="margin:0 0 8px 0;">BANK OF HOPES - C64</h2>
-
-    <div class="small" style="margin:0 0 10px 0;">
-      Premi PLAY per iniziare. Il caricamento è automatico.
-    </div>
-
+    <div class="small" style="margin:0 0 10px 0;">Premi PLAY per iniziare.</div>
     <div style="margin:0 0 10px 0;">
       <button id="go">PLAY</button>
       <a class="btn" href="./gioco.d64">Scarica D64</a>
     </div>
-
-    <div class="small">
-      Se resta su READY, non toccare nulla: il gioco partirà da solo in pochi secondi.
-    </div>
+    <div class="small">Se resta su READY, attendi qualche secondo l'avvio automatico.</div>
   </div>
-
   <div id="p"></div>
 </div>
 
 <script>
+  // --- CODICE ANTI-CACHE (Uccide il vecchio Service Worker) ---
+  if(window.navigator && navigator.serviceWorker) {
+    navigator.serviceWorker.getRegistrations()
+    .then(function(registrations) {
+      for(let registration of registrations) {
+        registration.unregister();
+        console.log("Service Worker Ucciso: Cache liberata.");
+      }
+    });
+  }
+  // ------------------------------------------------------------
+
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-  // Digita lentamente per evitare casino con virgolette (specie se l’utente ha warp attivo)
   async function typeSlow(text, perCharMs = 18) {
     for (const ch of text) {
       await action(`${ch}`);
@@ -67,15 +69,11 @@
   async function autorun() {
     await wasm_ready_after_reset();
     await sleep(150);
-
     // LOAD"*",8,1
     await typeSlow('LOAD"*",8,1', 18);
     await action(`=>Enter`);
-
     await disk_loading_finished();
-
     await sleep(150);
-
     // RUN
     await typeSlow('RUN', 18);
     await action(`=>Enter`);
@@ -83,34 +81,30 @@
 
   document.getElementById("go").addEventListener("click", () => {
     const config = {
-      // UI ON così l’utente può aprire Settings / Warp, ecc.
       navbar: true,
       wide: true,
       port2: true,
       border: 0.3,
-
-      // --- MODIFICA: CARICAMENTO AUTOMATICO ROM ---
-      // Impostiamo questo a false o lo omettiamo, perchè forniamo noi i file
+      
+      // DISATTIVA la richiesta manuale delle ROM
       dialog_on_missing_roms: false,
 
-      // Qui indichiamo i percorsi dei file .bin sul tuo server
-     roms: {
-          basic:  "./roms/basic.bin",
-          kernal: "./roms/kernal.bin",
-          char:   "./roms/chargen.bin",
-          d1541:  "./roms/d1541II.bin"
+      // PERCORSI DELLE ROM (Assicurati che siano nella cartella 'roms' su GitHub)
+      roms: {
+          basic:   "./roms/basic.bin",
+          kernal:  "./roms/kernal.bin",
+          // Mettiamo entrambe le chiavi per sicurezza massima:
+          char:    "./roms/chargen.bin",
+          chargen: "./roms/chargen.bin",
+          d1541:   "./roms/d1541II.bin"
       },
-      },
-      // --------------------------------------------
 
-      // Script di auto-avvio
       buttons: [{
         run: true,
         script: `(${autorun.toString()})();`
       }]
     };
 
-    // Monta il disco automaticamente
     vc64web_player.samesite_file = {
       url: "./gioco.d64",
       name: "gioco.d64"
