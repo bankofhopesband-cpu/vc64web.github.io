@@ -2,22 +2,27 @@
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <title>Test ROM</title>
+  <title>C64 Base64 Loader</title>
   <script src="./js/vc64web_player.js"></script>
   <style>
-    body { background: #111; color: white; font-family: sans-serif; text-align: center; padding-top: 50px; }
-    button { padding: 20px 40px; font-size: 24px; font-weight: bold; cursor: pointer; background: red; color: white; border: none; }
-    #p { margin: 20px auto; width: 80%; height: 600px; background: #000; border: 2px solid #555; }
+    body { background: #111; color: white; font-family: sans-serif; padding: 20px; text-align: center; }
+    #status { padding: 15px; margin-bottom: 20px; border: 1px solid #444; background: #222; white-space: pre-line; }
+    button { padding: 15px 30px; font-size: 20px; cursor: pointer; background: #00aa00; color: white; border: none; font-weight: bold; border-radius: 8px; }
+    #p { width: 90%; height: 70vh; background: #000; border: 2px solid #666; margin: 0 auto; }
   </style>
 </head>
 <body>
 
-<button id="btnStart">CLICCA PER TESTARE LE ROM</button>
+<div id="status">Premi il pulsante per caricare e convertire le ROM.</div>
+<button id="btnStart">AVVIA GIOCO (Iniezione Diretta)</button>
 
 <div id="p"></div>
 
 <script>
-  // I TUOI LINK (Controllali!)
+  const statusDiv = document.getElementById("status");
+  function log(msg) { statusDiv.innerHTML += "\n" + msg; }
+
+  // I TUOI LINK FUNZIONANTI
   const ROM_URLS = {
     basic:   "https://lucent-marzipan-81e5b7.netlify.app/roms/basic.bin",
     kernal:  "https://lucent-marzipan-81e5b7.netlify.app/roms/kernal.bin",
@@ -25,42 +30,49 @@
     d1541:   "https://lucent-marzipan-81e5b7.netlify.app/roms/d1541II.bin"
   };
 
+  // Funzione per convertire il file in stringa Base64
+  const blobToBase64 = (blob) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
   document.getElementById("btnStart").addEventListener("click", async () => {
-    
-    // 1. PRIMO POPUP DI CONTROLLO
-    alert("Inizio il test. Se leggi questo, il codice è nuovo.");
+    const btn = document.getElementById("btnStart");
+    btn.disabled = true;
+    btn.innerText = "Caricamento in corso...";
+    statusDiv.innerHTML = "Inizio procedura di iniezione...";
 
     try {
-      const romBlobs = {};
-      let report = "Report Scaricamento:\n";
+      const romDataURIs = {};
 
       for (const [key, url] of Object.entries(ROM_URLS)) {
-        // Scarichiamo il file
+        log(`Scarico ${key}...`);
         const resp = await fetch(url);
-        
-        if (!resp.ok) {
-           alert("ERRORE CRITICO!\nNon riesco a trovare: " + key + "\nLink provato: " + url);
-           return; // Ci fermiamo subito
-        }
+        if (!resp.ok) throw new Error(`Errore scaricamento ${key}`);
         
         const blob = await resp.blob();
-        report += key + ": OK (" + blob.size + " bytes)\n";
-        romBlobs[key] = URL.createObjectURL(blob);
+        log(`Converto ${key} in Base64...`);
+        // Qui avviene la magia: trasformiamo il file in una stringa "data:..."
+        const base64Data = await blobToBase64(blob);
+        romDataURIs[key] = base64Data;
       }
 
-      // 2. SECONDO POPUP: TUTTO OK
-      alert(report + "\n\nAdesso provo a lanciare l'emulatore.");
+      log("Tutte le ROM pronte. Configuro l'emulatore...");
 
-      // Configurazione
       const config = {
         navbar: true, wide: true, port2: true,
-        dialog_on_missing_roms: false, // ZITTO E CARICA
+        dialog_on_missing_roms: false, // Disabilita richiesta file
         roms: {
-            basic:   romBlobs.basic,
-            kernal:  romBlobs.kernal,
-            char:    romBlobs.char,
-            chargen: romBlobs.char, 
-            d1541:   romBlobs.d1541
+            // Passiamo direttamente i dati, non i link!
+            basic:   romDataURIs.basic,
+            kernal:  romDataURIs.kernal,
+            char:    romDataURIs.char,
+            chargen: romDataURIs.char, 
+            d1541:   romDataURIs.d1541
         },
         buttons: [{
           run: true,
@@ -78,10 +90,16 @@
       };
 
       vc64web_player.samesite_file = { url: "./gioco.d64", name: "gioco.d64" };
+      
       vc64web_player.load(document.getElementById("p"), encodeURIComponent(JSON.stringify(config)));
+      
+      btn.style.display = 'none';
+      log("Emulatore avviato!");
 
     } catch (err) {
-      alert("ERRORE SCONOSCIUTO:\n" + err.message);
+      alert("ERRORE: " + err.message);
+      btn.disabled = false;
+      btn.innerText = "Riprova";
     }
   });
 </script>
