@@ -2,104 +2,129 @@
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <title>C64 Base64 Loader</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>C64 - ZIP Loader</title>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="./js/vc64web_player.js"></script>
+
   <style>
-    body { background: #111; color: white; font-family: sans-serif; padding: 20px; text-align: center; }
-    #status { padding: 15px; margin-bottom: 20px; border: 1px solid #444; background: #222; white-space: pre-line; }
-    button { padding: 15px 30px; font-size: 20px; cursor: pointer; background: #00aa00; color: white; border: none; font-weight: bold; border-radius: 8px; }
-    #p { width: 90%; height: 70vh; background: #000; border: 2px solid #666; margin: 0 auto; }
+    body { background: #222; color: #fff; font-family: monospace; text-align: center; margin-top: 20px; }
+    #status { padding: 15px; border: 1px solid #444; background: #000; white-space: pre-wrap; margin-bottom: 20px; color: #0f0; }
+    button { padding: 15px 30px; font-size: 20px; font-weight: bold; cursor: pointer; background: #ff9900; color: black; border: none; }
+    #p { width: 90%; height: 70vh; background: #000; border: 4px solid #666; margin: 0 auto; }
   </style>
 </head>
+
 <body>
 
-<div id="status">Premi il pulsante per caricare e convertire le ROM.</div>
-<button id="btnStart">AVVIA GIOCO (Iniezione Diretta)</button>
+<h2>CARICAMENTO DA ZIP UNICO</h2>
+<div id="status">In attesa... Assicurati di aver caricato 'bundle.zip'</div>
+<button id="btnLoad">APRI IL PACCO REGALO (bundle.zip)</button>
 
 <div id="p"></div>
 
 <script>
-  const statusDiv = document.getElementById("status");
-  function log(msg) { statusDiv.innerHTML += "\n" + msg; }
+  // CONFIGURAZIONE: Assicurati che il nome sia giusto
+  const ZIP_URL = "./bundle.zip"; 
+  // Se il file è in una cartella roms: "./roms/bundle.zip"
 
-  // I TUOI LINK FUNZIONANTI
-  const ROM_URLS = {
-    basic:   "https://lucent-marzipan-81e5b7.netlify.app/roms/basic.bin",
-    kernal:  "https://lucent-marzipan-81e5b7.netlify.app/roms/kernal.bin",
-    char:    "https://lucent-marzipan-81e5b7.netlify.app/roms/chargen.bin",
-    d1541:   "https://lucent-marzipan-81e5b7.netlify.app/roms/d1541II.bin"
-  };
+  const logDiv = document.getElementById("status");
+  function log(msg) { logDiv.innerText += "\n" + msg; }
 
-  // Funzione per convertire il file in stringa Base64
-  const blobToBase64 = (blob) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  };
-
-  document.getElementById("btnStart").addEventListener("click", async () => {
-    const btn = document.getElementById("btnStart");
+  document.getElementById("btnLoad").addEventListener("click", async function() {
+    const btn = this;
     btn.disabled = true;
-    btn.innerText = "Caricamento in corso...";
-    statusDiv.innerHTML = "Inizio procedura di iniezione...";
+    log("Scarico il file ZIP...");
 
     try {
-      const romDataURIs = {};
+      // 1. Scarica lo ZIP intero
+      const response = await fetch(ZIP_URL);
+      if (!response.ok) throw new Error("File bundle.zip non trovato! Controlla dove l'hai messo.");
+      const blob = await response.blob();
 
-      for (const [key, url] of Object.entries(ROM_URLS)) {
-        log(`Scarico ${key}...`);
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`Errore scaricamento ${key}`);
-        
-        const blob = await resp.blob();
-        log(`Converto ${key} in Base64...`);
-        // Qui avviene la magia: trasformiamo il file in una stringa "data:..."
-        const base64Data = await blobToBase64(blob);
-        romDataURIs[key] = base64Data;
+      // 2. Apre lo ZIP
+      log("Apro lo ZIP...");
+      const zip = await JSZip.loadAsync(blob);
+      
+      const files = {};
+      let gameFile = null;
+
+      // 3. Cerca i file dentro lo ZIP (ignora maiuscole/minuscole)
+      log("Cerco le ROM e il gioco...");
+      
+      // Funzione helper per cercare file ignorando il case
+      const findFile = (namePart) => {
+         const found = Object.keys(zip.files).find(n => n.toLowerCase().includes(namePart.toLowerCase()));
+         return found ? zip.files[found] : null;
+      };
+
+      // Estraiamo i dati come Blob
+      const basic   = findFile("basic");
+      const kernal  = findFile("kernal");
+      const chargen = findFile("char");
+      const d1541   = findFile("d1541");
+      
+      // Cerchiamo il gioco (.d64 o .tap)
+      const gameEntry = Object.keys(zip.files).find(n => n.toLowerCase().endsWith(".d64") || n.toLowerCase().endsWith(".tap"));
+
+      if (!basic || !kernal || !chargen) {
+        throw new Error("MANCANO LE ROM NELLO ZIP!\nDevi metterci dentro: basic.bin, kernal.bin, chargen.bin");
+      }
+      if (!gameEntry) {
+        throw new Error("MANCA IL GIOCO NELLO ZIP!\nNon trovo nessun file .d64 o .tap");
       }
 
-      log("Tutte le ROM pronte. Configuro l'emulatore...");
+      // Convertiamo tutto in URL per l'emulatore
+      const basicUrl   = URL.createObjectURL(await basic.async("blob"));
+      const kernalUrl  = URL.createObjectURL(await kernal.async("blob"));
+      const charUrl    = URL.createObjectURL(await chargen.async("blob"));
+      const d1541Url   = d1541 ? URL.createObjectURL(await d1541.async("blob")) : null;
+      
+      const gameBlob   = await zip.files[gameEntry].async("blob");
+      const gameUrl    = URL.createObjectURL(gameBlob);
 
+      log(`Trovato gioco: ${gameEntry}`);
+      log("ROM pronte. Avvio...");
+
+      // 4. Configurazione Emulatore
       const config = {
         navbar: true, wide: true, port2: true,
-        dialog_on_missing_roms: false, // Disabilita richiesta file
+        dialog_on_missing_roms: false, // Silenzia le richieste
         roms: {
-            // Passiamo direttamente i dati, non i link!
-            basic:   romDataURIs.basic,
-            kernal:  romDataURIs.kernal,
-            char:    romDataURIs.char,
-            chargen: romDataURIs.char, 
-            d1541:   romDataURIs.d1541
+            basic:   basicUrl,
+            kernal:  kernalUrl,
+            char:    charUrl,
+            chargen: charUrl,
+            d1541:   d1541Url // Se è null (manca), pazienza
         },
         buttons: [{
           run: true,
           script: `(async function() {
              await wasm_ready_after_reset();
-             const s = (ms) => new Promise(r => setTimeout(r, ms));
-             await s(1000);
-             const t = async(text) => { for(let c of text) { await action(c); await s(20); } };
-             await t('LOAD"*",8,1'); await action('=>Enter');
-             await disk_loading_finished();
-             await s(500);
-             await t('RUN'); await action('=>Enter');
+             const w = (ms) => new Promise(r => setTimeout(r, ms));
+             await w(1000);
+             // Auto-load intelligente
+             const cmd = '${gameEntry.endsWith(".tap") ? "LOAD" : 'LOAD"*",8,1'}';
+             const type = async(t) => { for(let c of t) { await action(c); await w(30); } };
+             await type(cmd); await action('=>Enter');
+             await disk_loading_finished(); // Aspetta caricamento
+             await w(500);
+             await type('RUN'); await action('=>Enter');
           })()`
         }]
       };
 
-      vc64web_player.samesite_file = { url: "./gioco.d64", name: "gioco.d64" };
+      vc64web_player.samesite_file = { url: gameUrl, name: gameEntry };
       
       vc64web_player.load(document.getElementById("p"), encodeURIComponent(JSON.stringify(config)));
       
       btn.style.display = 'none';
-      log("Emulatore avviato!");
 
     } catch (err) {
-      alert("ERRORE: " + err.message);
+      log("ERRORE: " + err.message);
+      alert(err.message);
       btn.disabled = false;
-      btn.innerText = "Riprova";
     }
   });
 </script>
