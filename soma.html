@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gioca - C64</title>
+
+  <style>
+    html, body { height: 100%; margin: 0; background:#000; }
+    #wrap { height: 100%; display: flex; flex-direction: column; }
+    #topbar {
+      padding: 10px 12px; background:#111; color:#fff;
+      font-family: system-ui, Arial, sans-serif; font-weight: 800;
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    #topbar a { color:#fff; opacity:.9; }
+    #game { flex: 1; }
+  </style>
+</head>
+
+<body>
+  <div id="wrap">
+    <div id="topbar">
+      <span>▶ C64 Online</span>
+      <span style="opacity:.7;font-weight:700">Se non parte: premi RUN dentro al C64</span>
+      <a href="./gioco.prg" style="margin-left:auto">Scarica PRG</a>
+    </div>
+
+    <div id="game"></div>
+  </div>
+
+  <script>
+    // Dove renderizzare l’emulatore
+    window.EJS_player = "#game";
+
+    // Core: per C64 puoi usare 'c64' oppure direttamente 'vice_x64sc' (più accurato) :contentReference[oaicite:2]{index=2}
+    window.EJS_core = "vice_x64sc";
+
+    // Il tuo gioco (stesso dominio Netlify)
+    window.EJS_gameUrl = "./gioco.prg";
+
+    // CDN ufficiale (non devi hostare la cartella data/) :contentReference[oaicite:3]{index=3}
+    window.EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
+
+    // (opzionale) Lingua UI
+    window.EJS_language = "it";
+
+    // Carica EmulatorJS loader dal CDN :contentReference[oaicite:4]{index=4}
+    var s = document.createElement("script");
+    s.src = "https://cdn.emulatorjs.org/stable/data/loader.js";
+    document.body.appendChild(s);
+  </script>
+</body>
+</html>
